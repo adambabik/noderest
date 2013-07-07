@@ -1,0 +1,27 @@
+{
+  "name": "noderest",
+  "version": "0.1.0",
+  "description": "A high-level abstraction for REST APIs build with node.js.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "lodash": "~1.2.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/dreame4/noderest.git"
+  },
+  "keywords": [
+    "rest",
+    "api"
+  ],
+  "author": "Adam Babik",
+  "license": "MIT",
+  "gitHead": "4221f267224267b4517a24aae03e438fd4fc2ba6",
+  "readmeFilename": "README.md",
+  "bugs": {
+    "url": "https://github.com/dreame4/noderest/issues"
+  }
+}
