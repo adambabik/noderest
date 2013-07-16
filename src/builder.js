@@ -65,6 +65,11 @@ function Builder(config) {
 
 Builder.Resource = Resource;
 
+Builder.prototype._buildRegExp = function Builder__buildRegExt(pathFragments) {
+	var c = this.config;
+	return new RegExp('^' + (c.version ? '\\/' + c.version : '') + pathFragments + '(\\?.*)?$');
+};
+
 /**
  * resource
  * @param  {String} path
@@ -88,7 +93,7 @@ Builder.prototype.getList = function Builder_getList(handler) {
 	assertFunction(handler);
 
 	var pathFragments = this.pathFragments.join('/').replace(/\//g, '\\/'),
-		path = new RegExp('^' + pathFragments + '(\\?.*)?$');
+		path = this._buildRegExp(pathFragments);
 
 	this.currentResource.push(new Resource(Resource.Type.LIST, path, null, handler));
 
@@ -137,7 +142,7 @@ Builder.prototype.get = function Builder_get(path, config, handler) {
 	});
 
 	pathFragments = this.pathFragments.join('/').replace(/\//g, '\\/');
-	builtPath = new RegExp('^' + pathFragments + '(\\?.*)?$');
+	builtPath = this._buildRegExp(pathFragments);
 
 	this.currentResource.push(new Resource(Resource.Type.GET, builtPath, config, handler));
 

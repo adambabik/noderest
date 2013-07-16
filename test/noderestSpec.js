@@ -14,10 +14,7 @@ myAPI.
 			limit = params.limit || 20;
 
 		for(var i = 0; i < limit; i++) {
-			tab.push({
-				id: i,
-				name: 'Product #' + i
-			});
+			tab.push({ id: i, name: 'Product #' + i });
 		}
 
 		done(null, tab);
@@ -42,7 +39,48 @@ http.createServer(app).listen(3123);
 var expect  = require('chai').expect;
 
 describe('noderest', function () {
+	describe('configuration', function () {
+		it('should handle version in the path', function (done) {
+			var versionedAPI = noderest.create({ version: '1.0' });
+
+			versionedAPI
+				.resource('books')
+				.get('/:id', { id: /\d+/ }, function (params, done) {
+					done(null, { id: parseInt(params.id, 10) });
+				});
+
+			app.use(noderest.middleware(versionedAPI));
+
+			var req = http.request({
+				port: 3123,
+				path: '/1.0/books/22'
+			}, function (res) {
+				var buf = '';
+
+				res.on('data', function (chunk) {
+					buf += chunk;
+				});
+
+				res.on('end', function () {
+					var obj = JSON.parse(buf);
+
+					expect(res.statusCode).to.equal(200);
+					expect(obj.id).to.equal(22);
+
+					done();
+				});
+			}).end();
+		});
+	});
+
 	describe('#getList()', function () {
+		before(function() {
+			app.use(function (req, res) {
+				res.statusCode = 404;
+				res.end();
+			});
+		});
+
 		it('without parameters', function (done) {
 			http.request({
 				port: 3123,
@@ -136,8 +174,4 @@ describe('noderest', function () {
 			}).end();
 		});
 	});
-
-	// the tests would follow such a scenario:
-	// 1. Create a http.ClientRequest to localhost:3123 with specific method, URL and params,
-	// 2. Examine the response as the only result as it's supposed to be a high level test.
 });
