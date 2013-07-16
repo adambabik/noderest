@@ -4,10 +4,15 @@
   "description": "A high-level abstraction for REST APIs build with node.js.",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "mocha -R spec test"
   },
   "dependencies": {
     "lodash": "~1.2.1"
+  },
+  "devDependencies": {
+    "mocha": "*",
+    "chai": "*",
+    "connect": "~2.8.4"
   },
   "repository": {
     "type": "git",
