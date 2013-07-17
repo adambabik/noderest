@@ -55,19 +55,14 @@ function Builder(config) {
 	this.config = config;
 
 	// current path fragments which are used to create `path` instance variable in Resource instances
-	// @TODO: information about API version should be included
-	this.pathFragments = [''];
-
-	// named resources created by `resource` method
-	this.resources = {};
-	this.currentResource = null;
+	this.pathFragments = [config.version ? '/' + config.version : ''];
+	this.resources = [];
 }
 
 Builder.Resource = Resource;
 
 Builder.prototype._buildRegExp = function Builder__buildRegExt(pathFragments) {
-	var c = this.config;
-	return new RegExp('^' + (c.version ? '\\/' + c.version : '') + pathFragments + '(\\?.*)?$');
+	return new RegExp('^' + pathFragments + '(\\?.*)?$');
 };
 
 /**
@@ -79,7 +74,6 @@ Builder.prototype.resource = function Builder_resource(path) {
 	assertString(path);
 
 	this.pathFragments.push(path);
-	this.currentResource = this.resources[path] = [];
 
 	return this;
 };
@@ -95,7 +89,7 @@ Builder.prototype.getList = function Builder_getList(handler) {
 	var pathFragments = this.pathFragments.join('/').replace(/\//g, '\\/'),
 		path = this._buildRegExp(pathFragments);
 
-	this.currentResource.push(new Resource(Resource.Type.LIST, path, null, handler));
+	this.resources.push(new Resource(Resource.Type.LIST, path, null, handler));
 
 	return this;
 };
@@ -144,7 +138,7 @@ Builder.prototype.get = function Builder_get(path, config, handler) {
 	pathFragments = this.pathFragments.join('/').replace(/\//g, '\\/');
 	builtPath = this._buildRegExp(pathFragments);
 
-	this.currentResource.push(new Resource(Resource.Type.GET, builtPath, config, handler));
+	this.resources.push(new Resource(Resource.Type.GET, builtPath, config, handler));
 
 	return this;
 };

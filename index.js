@@ -16,7 +16,7 @@ var defaults = {
 
 noderest.create = function (config) {
 	config || (config = {});
-	return new Builder(_.merge({}, defaults, config));
+	return new Builder(_.extend({}, defaults, config));
 };
 
 noderest.middleware = function (api) {
@@ -25,57 +25,58 @@ noderest.middleware = function (api) {
 	}
 
 	return function (req, res, next) {
-		var reqUrl = url.parse(req.url, true),
-			parts  = reqUrl.pathname.split('/'),
-			params = _.clone(req.query) || {},
-			resources,
-			foundResource,
-			i = 0, len = parts.length;
+		var reqUrl     = url.parse(req.url, true),
+			parts      = reqUrl.pathname.split('/').slice(1),
+			params     = _.clone(req.query) || {},
+			resources  = api.resources,
+			resource   = null,
+			i          = 0,
+			len        = parts.length;
 
-		parts = parts.slice(api.config.version ? 2 : 1);
-
+		// root?
 		if (parts.length === 0) {
 			next();
 			return;
 		}
 
-		resources = api.resources[parts[0]];
+		// remove version info
+		if (api.config.version) {
+			parts = parts.slice(1);
+		}
 
-		if (!resources) {
+		// no resources
+		if (!resources.length) {
 			next();
 			return;
 		}
 
-		resources.forEach(function (item) {
-			if (!item.path.test(req.url)) {
-				return;
+		for (i = 0, len = resources.length; i < len; i++) {
+			resource = resources[i];
+			if (resource.path.test(req.url)) {
+				break;
 			}
+			resource = null;
+		}
 
-			// already found matching url, throw error
-			if (foundResource) {
-				throw new Error('Matched more than one generated path ' + item.path + '. Previous ' + foundResource.path);
-			}
+		if (!resource) {
+			next();
+			return;
+		}
 
-			foundResource = item;
-		});
-
-		if (foundResource) {
-			// start from 1 because under 0 is a resource name
+		if (resource.params) {
 			// this loop copies parameters from the route to the params object
-			for(i = 1, len = parts.length; i < len; i++) {
-				Object.keys(foundResource.params).forEach(function (key) {
-					if (foundResource.params[key].index + 1 === i) {
+			for(i = 0, len = parts.length; i < len; i++) {
+				Object.keys(resource.params).forEach(function (key) {
+					if (resource.params[key].index + 1 === i) {
 						params[key] = parts[i];
 					}
 				});
 			}
-
-			foundResource.handler.call({ req: req, res: res, next: next }, params, function (err, data) {
-				res.end(JSON.stringify(data));
-			});
-		} else {
-			next();
 		}
+
+		resource.handler.call({ req: req, res: res, next: next }, params, function (err, data) {
+			res.end(JSON.stringify(data));
+		});
 	};
 };
 

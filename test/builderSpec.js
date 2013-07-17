@@ -22,8 +22,8 @@ describe('Builder', function () {
 	it('#resource()', function () {
 		var ref = builder.resource('products');
 		expect(builder).to.equal(ref);
+		// one is an empty string or verison number, the second is `products`
 		expect(builder.pathFragments).to.have.length(2);
-		expect(builder.resources.products).to.not.be.undefined;
 	});
 
 	it('#getList()', function () {
@@ -31,10 +31,12 @@ describe('Builder', function () {
 
 		builder.resource('products').getList(function () {});
 
-		expect(builder.currentResource).to.have.length(1);
-		expect(builder.currentResource[0]).to.be.instanceof(Builder.Resource);
+		expect(builder.resources).to.have.length(1);
 
-		resource = builder.currentResource[0];
+		resource = builder.resources[0];
+
+		expect(resource).to.be.instanceof(Builder.Resource);
+
 		match = resource.path.exec('/products').filter(function (m) {
 			return !!m;
 		});
@@ -51,9 +53,9 @@ describe('Builder', function () {
 
 		builder.resource('products').get('/:id', { id: /\d+/ }, function () {});
 
-		expect(builder.currentResource).to.have.length(1);
+		expect(builder.resources).to.have.length(1);
 
-		resource = builder.currentResource[0];
+		resource = builder.resources[0];
 		match = resource.path.exec('/products/1').filter(function (m) {
 			return !!m;
 		});
