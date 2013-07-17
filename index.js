@@ -31,20 +31,17 @@ noderest.middleware = function (api) {
 			resources  = api.resources,
 			resource   = null,
 			i          = 0,
-			len        = parts.length;
+			len        = 0;
 
-		// root?
 		if (parts.length === 0) {
 			next();
 			return;
 		}
 
-		// remove version info
 		if (api.config.version) {
 			parts = parts.slice(1);
 		}
 
-		// no resources
 		if (!resources.length) {
 			next();
 			return;

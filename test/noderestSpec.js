@@ -51,7 +51,7 @@ describe('noderest', function () {
 
 			app.use(noderest.middleware(versionedAPI));
 
-			var req = http.request({
+			http.request({
 				port: 3123,
 				path: '/1.0/books/22'
 			}, function (res) {
@@ -70,6 +70,58 @@ describe('noderest', function () {
 					done();
 				});
 			}).end();
+		});
+	});
+
+	describe('noderest methods\' context and arguments', function() {
+		it('#get() should have req, res, next and correct arguments', function (_done) {
+			var api = noderest.create({ version: '1.0' });
+
+			api
+				.resource('cars')
+				.get('/:id', { id: /\d+/ }, function (params, done) {
+					expect(this.req).to.be.an('object');
+					expect(this.res).to.be.an('object');
+					expect(this.next).to.be.a('function');
+					expect(params).to.be.an('object');
+					expect(done).to.be.a('function');
+
+					done(null, { id: parseInt(params.id, 10) });
+
+					_done();
+				});
+
+			app.use(noderest.middleware(api));
+
+			http.request({
+				port: 3123,
+				path: '/1.0/cars/22'
+			}, function () {}).end();
+		});
+
+		it('#getList() should have req, res, next and correct arguments', function (_done) {
+			var api = noderest.create({ version: '1.0' });
+
+			api
+				.resource('cars')
+				.getList(function (params, done) {
+					expect(this.req).to.be.an('object');
+					expect(this.res).to.be.an('object');
+					expect(this.next).to.be.a('function');
+					expect(params).to.be.an('object');
+					expect(done).to.be.a('function');
+
+					done(null, []);
+
+					_done();
+				});
+
+			app.use(noderest.middleware(api));
+
+			http.request({
+				port: 3123,
+				path: '/1.0/cars'
+			}, function () {}).end();
 		});
 	});
 
