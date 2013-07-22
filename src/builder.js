@@ -1,68 +1,50 @@
 'use strict';
 
-var _ = require('lodash');
+var _        = require('lodash'),
+	Resource = require('./resource'),
+	a        = require('./assert');
 
-function assertString(arg) {
-	if (typeof arg !== 'string' || arg === '') {
-		throw new Error("Argument must be a string");
-	}
-}
-
-function assertFunction(arg) {
-	if (typeof arg !== 'function') {
-		throw new Error("Argument must be a function");
-	}
-}
-
-function assertNumber(arg) {
-	if (typeof arg !== 'number') {
-		throw new Error("Argument must be a number");
-	}
-}
-
-function createContext(req, res, next) {
-	return { req: req, res: res, next: next };
-}
-
-/**
- * Resource constructor
- * @constructor
- * @param {String}        method HTTP method
- * @param {String|RegExp} path
- * @param {Object}        params Description of what regex match
- * @param {Function}      handler Request handler
- */
-function Resource(type, path, params, handler) {
-	assertNumber(type);
-
-	this.type = type;
-	this.path = path;
-	this.params = params;
-	this.handler = handler;
-}
-
-Resource.Type = {
-	GET    : 0,
-	LIST   : 1,
-	SAVE   : 2,
-	UPDATE : 3,
-	DELETE : 4
+var defaults = {
+	version: null,
+	basePath: null,
+	types: ['json']
 };
 
-function Builder(config) {
-	config || (config = {});
+function Builder(config, pathFragments, resources) {
+	var c = this.config = _.extend({}, defaults, config || null);
 
-	this.config = config;
+	/** pathFragments */
 
-	// current path fragments which are used to create `path` instance variable in Resource instances
-	this.pathFragments = [config.version ? '/' + config.version : ''];
+	this.pathFragments = [];
+
+	//@TODO: Remove config from basePath
+	if (c.basePath) {
+		if (c.basePath[0] === '/') {
+			c.basePath = c.basePath.slice(1);
+		}
+		this.pathFragments.push(c.basePath);
+	}
+
+	if (c.version) {
+		this.pathFragments.push(c.version);
+	}
+
+	if (Array.isArray(pathFragments)) {
+		this.pathFragments = this.pathFragments.concat(pathFragments);
+	}
+
+	/** resources */
+
 	this.resources = [];
+
+	if (Array.isArray(resources)) {
+		this.resources = this.resources.concat(resources);
+	}
 }
 
-Builder.Resource = Resource;
-
 Builder.prototype._buildRegExp = function Builder__buildRegExt(pathFragments) {
-	return new RegExp('^' + pathFragments + '(\\?.*)?$');
+	pathFragments = ('/' + pathFragments.join('/')).replace(/\//g, '\\/');
+	return new RegExp('^' + pathFragments + '$');
 };
 
 /**
@@ -71,7 +53,7 @@ Builder.prototype._buildRegExp = function Builder__buildRegExt(pathFragments) {
  * @return {Object} self
  */
 Builder.prototype.resource = function Builder_resource(path) {
-	assertString(path);
+	a.str(path);
 
 	this.pathFragments.push(path);
 
@@ -84,11 +66,9 @@ Builder.prototype.resource = function Builder_resource(path) {
  * @return {Object}   self
  */
 Builder.prototype.getList = function Builder_getList(handler) {
-	assertFunction(handler);
+	a.fun(handler);
 
-	var pathFragments = this.pathFragments.join('/').replace(/\//g, '\\/'),
-		path = this._buildRegExp(pathFragments);
-
+	var path = this._buildRegExp(this.pathFragments);
 	this.resources.push(new Resource(Resource.Type.LIST, path, null, handler));
 
 	return this;
@@ -101,12 +81,12 @@ Builder.prototype.getList = function Builder_getList(handler) {
  * @param {Function} handler
  */
 Builder.prototype.get = function Builder_get(path, config, handler) {
-	assertString(path);
-	assertFunction(handler);
+	a.str(path);
+	a.fun(handler);
 
-	var self = this,
-		keys = path.match(/:\w+/g),
-		pathFragments,
+	var self  = this,
+		parts = path.split('/').slice(1),
+		keys  = path.match(/:\w+/g),
 		builtPath,
 		key;
 
@@ -128,16 +108,14 @@ Builder.prototype.get = function Builder_get(path, config, handler) {
 			throw new Error('Config does not contain ' + key);
 		}
 
-		config[key].index = idx;
+		config[key].index = idx + (parts.length - keys.length + 1);
 
 		// assume thta config[key] is a RegExp instance,
 		// fix it as it cna be a string as well
 		self.pathFragments.push('(' + config[key].re.toString().slice(1, -1) + ')');
 	});
 
-	pathFragments = this.pathFragments.join('/').replace(/\//g, '\\/');
-	builtPath = this._buildRegExp(pathFragments);
-
+	builtPath = this._buildRegExp(this.pathFragments);
 	this.resources.push(new Resource(Resource.Type.GET, builtPath, config, handler));
 
 	return this;
@@ -176,7 +154,7 @@ Builder.prototype.delete = function Builder_delete(path, config, handler) {
 };
 
 Builder.prototype.to = function Builder_to(path) {
-
+	return this;
 };
 
 module.exports = Builder;
