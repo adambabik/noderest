@@ -4,73 +4,81 @@ var _        = require('lodash'),
 	Resource = require('./resource'),
 	a        = require('./assert');
 
-var defaults = {
+var DEFAULTS = {
 	version:    null,
 	basePath:   null,
 	typeSuffix: false,
 	types:      ['json']
 };
 
+/**
+ * Builder
+ * @constructor
+ * @param {object} config
+ * @param {[array]} pathFragments
+ * @param {[array]} resources
+ */
 function Builder(config, pathFragments, resources) {
-	var c = this.config = _.extend({}, defaults, config || null);
+	config || (config = null);
+
+	var c = this.config = _.extend({}, DEFAULTS, config);
 
 	if (c.basePath && c.basePath[0] === '/') {
 		c.basePath = c.basePath.slice(1);
 	}
 
 	/** pathFragments */
-
 	this.pathFragments = [];
-
 	if (Array.isArray(pathFragments)) {
 		this.pathFragments = this.pathFragments.concat(pathFragments);
 	}
 
 	/** resources */
-
 	this.resources = [];
-
 	if (Array.isArray(resources)) {
 		this.resources = this.resources.concat(resources);
 	}
 }
 
-Builder.prototype._buildRegExp = function Builder__buildRegExt(pathFragments) {
+/**
+ * Build RegExp object based on provided fragments
+ * @private
+ * @param {array} pathFragments
+ */
+Builder.prototype._buildRegExp = function Builder__buildRegExp(pathFragments) {
 	var prefixes = [''],
 		c        = this.config,
 		joined;
 
-	if (c.basePath) {
-		prefixes.push(c.basePath);
-	}
-
-	if (c.version) {
-		prefixes.push(c.version);
-	}
+	typeof c.basePath === 'string' && prefixes.push(c.basePath);
+	typeof c.version === 'string' && prefixes.push(c.version);
 
 	prefixes.push('');
 
-	joined = (prefixes.join('/') + pathFragments.join('/') + (c.typeSuffix ? '\\.\\w+' : '')).replace(/\//g, '\\/');
-	return new RegExp('^' + joined + '$');
+	joined = (
+		prefixes.join('/') +
+		pathFragments.join('/') +
+		(c.typeSuffix ? '\\.\\w+' : '')
+	).replace(/\//g, '\\/');
+
+	return new RegExp('^' + joined + '$', 'i');
 };
 
 /**
- * resource
- * @param  {String} path
- * @return {Object} self
+ * Define new resource
+ * @param  {string} path
+ * @return {object} self
  */
 Builder.prototype.resource = function Builder_resource(path) {
 	a.str(path);
-
 	this.pathFragments.push(path);
-
 	return this;
 };
 
 /**
- * getList
- * @param  {Function} handler
- * @return {Object}   self
+ * Define GET resource
+ * @param  {function} handler
+ * @return {object}   self
  */
 Builder.prototype.getList = function Builder_getList(handler) {
 	a.fun(handler);
@@ -81,9 +89,14 @@ Builder.prototype.getList = function Builder_getList(handler) {
 	return this;
 };
 
+/**
+ * Parse path and match agains provided configuration.
+ * @private
+ * @param {string} path   pseudo path, like /products/:id
+ * @param {object} config configuration object which matches against tokens found in path
+ */
 Builder.prototype._parsePath = function Builder__parsePath(path, config) {
-	var self      = this,
-		fragments = [],
+	var fragments = [],
 		parts     = path.split('/').slice(1),
 		keys      = path.match(/:\w+/g),
 		key;
@@ -92,7 +105,6 @@ Builder.prototype._parsePath = function Builder__parsePath(path, config) {
 		if (!config.hasOwnProperty(key)) {
 			continue;
 		}
-
 		config[key] = {
 			re: config[key],
 			index: null
@@ -103,7 +115,7 @@ Builder.prototype._parsePath = function Builder__parsePath(path, config) {
 		key = key.slice(1);
 
 		if (!(key in config)) {
-			throw new Error('Config does not contain ' + key);
+			throw new Error("Config does not contain " + key);
 		}
 
 		config[key].index = idx + (parts.length - keys.length + 1);
@@ -117,10 +129,10 @@ Builder.prototype._parsePath = function Builder__parsePath(path, config) {
 };
 
 /**
- * get
- * @param {String} path For now, it should be a string that is a fragment of a regex
- * @param {Object} config
- * @param {Function} handler
+ * Create GET resource
+ * @param {string} path
+ * @param {object} config
+ * @param {function} handler
  */
 Builder.prototype.get = function Builder_get(path, config, handler) {
 	if (typeof config === 'function') {
@@ -136,21 +148,43 @@ Builder.prototype.get = function Builder_get(path, config, handler) {
 	// add elements to pathFragments
 	this.pathFragments = this.pathFragments.concat(this._parsePath(path, config));
 
-	var builtPath = this._buildRegExp(this.pathFragments);
-	this.resources.push(new Resource(Resource.Type.GET, builtPath, config, handler));
+	this.resources.push(
+		new Resource(
+			Resource.Type.GET,
+			this._buildRegExp(this.pathFragments),
+			config,
+			handler
+		)
+	);
 
 	return this;
 };
 
+/**
+ * Create POST resource
+ * @param {function} handler
+ */
 Builder.prototype.save = function Builder_save(handler) {
 	a.fun(handler);
 
-	var path = this._buildRegExp(this.pathFragments);
-	this.resources.push(new Resource(Resource.Type.SAVE, path, null, handler));
+	this.resources.push(
+		new Resource(
+			Resource.Type.SAVE,
+			this._buildRegExp(this.pathFragments),
+			null,
+			handler
+		)
+	);
 
 	return this;
 };
 
+/**
+ * Create PUT resource
+ * @param {string} path
+ * @param {object} config
+ * @param {function} handler
+ */
 Builder.prototype.update = function Builder_update(path, config, handler) {
 	if (typeof config === 'function') {
 		handler = config;
@@ -165,12 +199,24 @@ Builder.prototype.update = function Builder_update(path, config, handler) {
 	// add elements to pathFragments
 	this.pathFragments = this.pathFragments.concat(this._parsePath(path, config));
 
-	var builtPath = this._buildRegExp(this.pathFragments);
-	this.resources.push(new Resource(Resource.Type.UPDATE, builtPath, config, handler));
+	this.resources.push(
+		new Resource(
+			Resource.Type.UPDATE,
+			this._buildRegExp(this.pathFragments),
+			config,
+			handler
+		)
+	);
 
 	return this;
 };
 
+/**
+ * Create DELETE resource
+ * @param {string} path
+ * @param {object} config
+ * @param {function} handler
+ */
 Builder.prototype.delete = function Builder_delete(path, config, handler) {
 	if (typeof config === 'function') {
 		handler = config;
@@ -185,30 +231,24 @@ Builder.prototype.delete = function Builder_delete(path, config, handler) {
 	// add elements to pathFragments
 	this.pathFragments = this.pathFragments.concat(this._parsePath(path, config));
 
-	var builtPath = this._buildRegExp(this.pathFragments);
-	this.resources.push(new Resource(Resource.Type.DELETE, builtPath, config, handler));
+	this.resources.push(
+		new Resource(
+			Resource.Type.DELETE,
+			this._buildRegExp(this.pathFragments),
+			config,
+			handler
+		)
+	);
 
 	return this;
 };
 
-// Object.defineProperty(Builder.prototype, 'parent', {
-// 	get: function () {
-// 		return this._parent;
-// 	},
-// 	set: function (builder) {
-// 		if (!(builder instanceof Builder)) {
-// 			throw new Error("Parent must be an instance of Builder");
-// 		}
-
-// 		this._parent = builder;
-// 	}
-// });
-
+/**
+ * Create new instance of Builderwith current parh fragments, but empty resources array
+ * @return {object} Builder
+ */
 Builder.prototype.detach = function Builder_detach() {
-	var instance = new Builder(this.config, this.pathFragments);
-	//instance.parent = this;
-
-	return instance;
+	return new Builder(this.config, this.pathFragments);
 };
 
 module.exports = Builder;

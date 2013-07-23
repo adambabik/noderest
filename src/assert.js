@@ -1,21 +1,21 @@
 'use strict';
 
-module.exports = {
-	'str': function assertString(arg) {
-		if (typeof arg !== 'string' || arg === '') {
-			throw new Error("Argument must be a string");
-		}
-	},
+var a = module.exports = {};
 
-	'fun': function assertFunction(arg) {
-		if (typeof arg !== 'function') {
-			throw new Error("Argument must be a function");
-		}
-	},
+a.str = function assertString(arg) {
+	if (typeof arg !== 'string' || arg === '') {
+		throw new Error("Argument must be a string");
+	}
+};
 
-	'num': function assertNumber(arg) {
-		if (typeof arg !== 'number') {
-			throw new Error("Argument must be a number");
-		}
+a.fun = function assertFunction(arg) {
+	if (typeof arg !== 'function') {
+		throw new Error("Argument must be a function");
+	}
+};
+
+a.num = function assertNumber(arg) {
+	if (typeof arg !== 'number') {
+		throw new Error("Argument must be a number");
 	}
 };
