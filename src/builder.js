@@ -5,9 +5,10 @@ var _        = require('lodash'),
 	a        = require('./assert');
 
 var defaults = {
-	version: null,
-	basePath: null,
-	types: ['json']
+	version:    null,
+	basePath:   null,
+	typeSuffix: false,
+	types:      ['json']
 };
 
 function Builder(config, pathFragments, resources) {
@@ -49,7 +50,7 @@ Builder.prototype._buildRegExp = function Builder__buildRegExt(pathFragments) {
 
 	prefixes.push('');
 
-	joined = (prefixes.join('/') + pathFragments.join('/')).replace(/\//g, '\\/');
+	joined = (prefixes.join('/') + pathFragments.join('/') + (c.typeSuffix ? '\\.\\w+' : '')).replace(/\//g, '\\/');
 	return new RegExp('^' + joined + '$');
 };
 

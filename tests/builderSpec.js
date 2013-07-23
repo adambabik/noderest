@@ -17,7 +17,7 @@ describe('Builder', function () {
 		it('instantiate without config', function () {
 			builder = new Builder();
 			expect(builder).to.be.an('object');
-			expect(builder.config).to.deep.equal({ version: null, basePath: null, types: ['json'] });
+			expect(builder.config).to.deep.equal({ version: null, basePath: null, typeSuffix: false, types: ['json'] });
 			expect(builder.pathFragments).to.be.empty;
 		});
 
@@ -28,13 +28,31 @@ describe('Builder', function () {
 			});
 
 			expect(builder).to.be.an('object');
-			expect(builder.config).to.deep.equal({ version: '1.0', basePath: 'api', types: ['json'] });
+			expect(builder.config).to.deep.equal({
+				version: '1.0',
+				basePath: 'api',
+				typeSuffix: false,
+				types: ['json']
+			});
 			expect(builder.pathFragments).to.deep.equal([]);
 		});
 
 		it('instantiate with path fragments', function () {
 			builder = new Builder(null, ['products']);
 			expect(builder.pathFragments).to.deep.equal(['products']);
+		});
+
+		it('instantiate with type suffix', function () {
+			builder = new Builder({
+				typeSuffix: true
+			});
+
+			expect(builder.config).to.deep.equal({
+				version: null,
+				basePath: null,
+				typeSuffix: true,
+				types: ['json']
+			});
 		});
 	});
 
@@ -72,6 +90,10 @@ describe('Builder', function () {
 		builder = new Builder({ version: '1.0', basePath: 'api' });
 		re = builder._buildRegExp(['products']);
 		expect('/api/1.0/products').to.match(re);
+
+		builder = new Builder({ typeSuffix: true });
+		re = builder._buildRegExp(['products']);
+		expect('/products.json').to.match(re);
 	});
 
 	it('#_parsePath()', function () {

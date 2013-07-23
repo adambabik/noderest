@@ -68,10 +68,8 @@ function middleware(api) {
 		var reqUrl     = url.parse(req.url, true),
 			parts      = urlParts(api, reqUrl.pathname),
 			resources  = api.resources,
-			resource   = null,
+			resource   = findResource(resources, reqUrl.pathname, req.method),
 			params     = null;
-
-		resource = findResource(resources, reqUrl.pathname, req.method);
 
 		if (!resource) {
 			next();
