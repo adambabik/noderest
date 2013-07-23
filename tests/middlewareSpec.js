@@ -43,22 +43,52 @@ describe('middleware', function () {
 				resources    = [];
 
 			// with empty resources
-			expect(findResource(resources, '/books')).to.be.null;
+			expect(findResource(resources, '/books', 'GET')).to.be.null;
 
 			var getBooks = new Resource(Resource.Type.LIST, /^\/books$/, {}, null);
 			resources.push(getBooks);
 
-			// make sure if the resource is found
-			expect(findResource(resources, '/books')).to.equal(getBooks);
-			expect(findResource(resources, '/books/')).to.be.null;
-			expect(findResource(resources, '/books/1')).to.be.null;
+			expect(findResource(resources, '/books', 'GET')).to.equal(getBooks);
+			expect(findResource(resources, '/books/', 'GET')).to.be.null;
+			expect(findResource(resources, '/books/1', 'GET')).to.be.null;
+			expect(findResource(resources, '/books', 'POST')).to.be.null;
+			expect(findResource(resources, '/books', 'PUT')).to.be.null;
+			expect(findResource(resources, '/books', 'DELETE')).to.be.null;
+
+			// POST
+			expect(findResource(resources, '/cars', 'POST')).to.be.null;
+
+			var saveCars = new Resource(Resource.Type.SAVE, /^\/cars$/, {}, null);
+			resources.push(saveCars);
+
+			expect(findResource(resources, '/cars', 'GET')).to.be.null;
+			expect(findResource(resources, '/cars', 'POST')).to.equal(saveCars);
+
+			// PUT
+			expect(findResource(resources, '/books/1', 'PUT')).to.be.null;
+			resources.push(new Resource(Resource.Type.UPDATE, /^\/books\/(\d+)$/, null, null));
+			expect(findResource(resources, '/books/1', 'PUT')).to.be.instanceof(Resource);
+			expect(findResource(resources, '/books/1', 'GET')).to.be.null;
+
+			// DELETE
+			expect(findResource(resources, '/books/1', 'DELETE')).to.be.null;
+			resources.push(new Resource(Resource.Type.DELETE, /^\/books\/(\d+)$/, null, null));
+			expect(findResource(resources, '/books/1', 'DELETE')).to.be.instanceof(Resource);
+			expect(findResource(resources, '/books/1', 'GET')).to.be.null;
 		});
 	});
 
 	describe('parseParams', function () {
 		it('return params', function () {
-			var parseParams = middleware._private.parseParams,
-				resource    = new Resource(Resource.Type.GET, /^\/books\/(\d+)$/, { id: { re: /\d+/, index: 1 } }, null);
+			var parseParams = middleware._private.parseParams;
+			var resource    = new Resource(
+				Resource.Type.GET,
+				/^\/books\/(\d+)$/,
+				{
+					id: { re: /\d+/, index: 1 }
+				},
+				null
+			);
 
 			expect(parseParams(resource, null, ['books', '1'])).to.deep.equal({ id: '1' });
 			expect(parseParams(resource, {}, ['books', '1'])).to.deep.equal({ id: '1' });
@@ -123,7 +153,8 @@ describe('middleware', function () {
 
 			var req = {
 				url: '/books?test=true',
-				query: { test: 'true' }
+				query: { test: 'true' },
+				method: 'GET'
 			};
 
 			var next = function () {
@@ -140,7 +171,8 @@ describe('middleware', function () {
 					expect(data).to.have.length(2);
 
 					_done();
-				}
+				},
+				setHeader: function () {}
 			};
 
 			expect(instance(req, res, next));

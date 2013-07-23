@@ -13,21 +13,13 @@ var defaults = {
 function Builder(config, pathFragments, resources) {
 	var c = this.config = _.extend({}, defaults, config || null);
 
+	if (c.basePath && c.basePath[0] === '/') {
+		c.basePath = c.basePath.slice(1);
+	}
+
 	/** pathFragments */
 
 	this.pathFragments = [];
-
-	//@TODO: Remove config from basePath
-	if (c.basePath) {
-		if (c.basePath[0] === '/') {
-			c.basePath = c.basePath.slice(1);
-		}
-		this.pathFragments.push(c.basePath);
-	}
-
-	if (c.version) {
-		this.pathFragments.push(c.version);
-	}
 
 	if (Array.isArray(pathFragments)) {
 		this.pathFragments = this.pathFragments.concat(pathFragments);
@@ -43,8 +35,22 @@ function Builder(config, pathFragments, resources) {
 }
 
 Builder.prototype._buildRegExp = function Builder__buildRegExt(pathFragments) {
-	pathFragments = ('/' + pathFragments.join('/')).replace(/\//g, '\\/');
-	return new RegExp('^' + pathFragments + '$');
+	var prefixes = [''],
+		c        = this.config,
+		joined;
+
+	if (c.basePath) {
+		prefixes.push(c.basePath);
+	}
+
+	if (c.version) {
+		prefixes.push(c.version);
+	}
+
+	prefixes.push('');
+
+	joined = (prefixes.join('/') + pathFragments.join('/')).replace(/\//g, '\\/');
+	return new RegExp('^' + joined + '$');
 };
 
 /**
@@ -74,20 +80,11 @@ Builder.prototype.getList = function Builder_getList(handler) {
 	return this;
 };
 
-/**
- * get
- * @param {String} path For now, it should be a string that is a fragment of a regex
- * @param {Object} config
- * @param {Function} handler
- */
-Builder.prototype.get = function Builder_get(path, config, handler) {
-	a.str(path);
-	a.fun(handler);
-
-	var self  = this,
-		parts = path.split('/').slice(1),
-		keys  = path.match(/:\w+/g),
-		builtPath,
+Builder.prototype._parsePath = function Builder__parsePath(path, config) {
+	var self      = this,
+		fragments = [],
+		parts     = path.split('/').slice(1),
+		keys      = path.match(/:\w+/g),
 		key;
 
 	for(key in config) {
@@ -111,50 +108,106 @@ Builder.prototype.get = function Builder_get(path, config, handler) {
 		config[key].index = idx + (parts.length - keys.length + 1);
 
 		// assume thta config[key] is a RegExp instance,
-		// fix it as it cna be a string as well
-		self.pathFragments.push('(' + config[key].re.toString().slice(1, -1) + ')');
+		// fix it as it can be a string as well
+		fragments.push('(' + config[key].re.toString().slice(1, -1) + ')');
 	});
 
-	builtPath = this._buildRegExp(this.pathFragments);
+	return fragments;
+};
+
+/**
+ * get
+ * @param {String} path For now, it should be a string that is a fragment of a regex
+ * @param {Object} config
+ * @param {Function} handler
+ */
+Builder.prototype.get = function Builder_get(path, config, handler) {
+	if (typeof config === 'function') {
+		handler = config;
+		config = {};
+	} else {
+		config || (config = {});
+	}
+
+	a.str(path);
+	a.fun(handler);
+
+	// add elements to pathFragments
+	this.pathFragments = this.pathFragments.concat(this._parsePath(path, config));
+
+	var builtPath = this._buildRegExp(this.pathFragments);
 	this.resources.push(new Resource(Resource.Type.GET, builtPath, config, handler));
 
 	return this;
 };
 
 Builder.prototype.save = function Builder_save(handler) {
-	this.currentNode.handlers.POST = {
-		handler: handler
-	};
+	a.fun(handler);
+
+	var path = this._buildRegExp(this.pathFragments);
+	this.resources.push(new Resource(Resource.Type.SAVE, path, null, handler));
+
+	return this;
 };
 
 Builder.prototype.update = function Builder_update(path, config, handler) {
 	if (typeof config === 'function') {
 		handler = config;
 		config = {};
+	} else {
+		config || (config = {});
 	}
 
-	this.currentNode.handlers.PUT = {
-		handler: handler,
-		path: path,
-		config: config
-	};
+	a.str(path);
+	a.fun(handler);
+
+	// add elements to pathFragments
+	this.pathFragments = this.pathFragments.concat(this._parsePath(path, config));
+
+	var builtPath = this._buildRegExp(this.pathFragments);
+	this.resources.push(new Resource(Resource.Type.UPDATE, builtPath, config, handler));
+
+	return this;
 };
 
 Builder.prototype.delete = function Builder_delete(path, config, handler) {
 	if (typeof config === 'function') {
 		handler = config;
 		config = {};
+	} else {
+		config || (config = {});
 	}
 
-	this.currentNode.handlers.DELETE = {
-		handler: handler,
-		path: path,
-		config: config
-	};
+	a.str(path);
+	a.fun(handler);
+
+	// add elements to pathFragments
+	this.pathFragments = this.pathFragments.concat(this._parsePath(path, config));
+
+	var builtPath = this._buildRegExp(this.pathFragments);
+	this.resources.push(new Resource(Resource.Type.DELETE, builtPath, config, handler));
+
+	return this;
 };
 
-Builder.prototype.to = function Builder_to(path) {
-	return this;
+// Object.defineProperty(Builder.prototype, 'parent', {
+// 	get: function () {
+// 		return this._parent;
+// 	},
+// 	set: function (builder) {
+// 		if (!(builder instanceof Builder)) {
+// 			throw new Error("Parent must be an instance of Builder");
+// 		}
+
+// 		this._parent = builder;
+// 	}
+// });
+
+Builder.prototype.detach = function Builder_detach() {
+	var instance = new Builder(this.config, this.pathFragments);
+	//instance.parent = this;
+
+	return instance;
 };
 
 module.exports = Builder;

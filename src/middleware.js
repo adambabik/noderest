@@ -19,7 +19,7 @@ function urlParts(api, pathname) {
 	return parts;
 }
 
-function findResource(resources, pathname) {
+function findResource(resources, pathname, method) {
 	var resource = null,
 		i        = 0,
 		len      = 0;
@@ -29,7 +29,7 @@ function findResource(resources, pathname) {
 	}
 
 	for (i = 0, len = resources.length; i < len; i++) {
-		if (resources[i].path.test(pathname)) {
+		if (resources[i].path.test(pathname) && resources[i].matchHttpMethod(method)) {
 			resource = resources[i];
 			break;
 		}
@@ -71,7 +71,7 @@ function middleware(api) {
 			resource   = null,
 			params     = null;
 
-		resource = findResource(resources, reqUrl.pathname);
+		resource = findResource(resources, reqUrl.pathname, req.method);
 
 		if (!resource) {
 			next();
@@ -82,8 +82,16 @@ function middleware(api) {
 		params = parseParams(resource, req.query, parts);
 
 		resource.handler.call(createContext(req, res, next), params, function (err, data) {
+			// set headers
+			res.setHeader('Content-Type', 'application/json; charset=utf-8');
+
 			if (err) {
-				res.end();
+				// make sure the statusCode is not 200
+				if (res.statusCode < 400) {
+					res.statusCode = 400;
+				}
+
+				res.end(JSON.stringify(err));
 				return;
 			}
 

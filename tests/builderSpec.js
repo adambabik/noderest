@@ -29,50 +29,91 @@ describe('Builder', function () {
 
 			expect(builder).to.be.an('object');
 			expect(builder.config).to.deep.equal({ version: '1.0', basePath: 'api', types: ['json'] });
-			expect(builder.pathFragments).to.deep.equal(['api', '1.0']);
+			expect(builder.pathFragments).to.deep.equal([]);
+		});
+
+		it('instantiate with path fragments', function () {
+			builder = new Builder(null, ['products']);
+			expect(builder.pathFragments).to.deep.equal(['products']);
 		});
 	});
 
 	it('#_buildRegExp()', function () {
-		var buildRegExp = Builder.prototype._buildRegExp, re;
+		var re;
+		builder = new Builder();
 
-		expect(buildRegExp(['products'])).instanceof(RegExp);
+		expect(builder._buildRegExp([])).instanceof(RegExp);
 
-		re = buildRegExp(['products']);
+		re = builder._buildRegExp(['products']);
 		expect('/products').to.match(re);
 		expect('/products/').to.not.match(re);
 		expect('/products?test=true').to.not.match(re); // test only against pathname
 
-		re = buildRegExp(['products', 'books']);
+		re = builder._buildRegExp(['products', 'books']);
 		expect('/products/books').to.match(re);
 
-		re = buildRegExp(['products', '(\\d+)']);
+		re = builder._buildRegExp(['products', '(\\d+)']);
 		expect('/products').to.not.match(re);
 		expect('/products/1').to.match(re);
 		expect('/products/1?test=true').to.not.match(re); // test only against pathname
 
-		re = buildRegExp(['products', 'books', '(\\d+)']);
+		re = builder._buildRegExp(['products', 'books', '(\\d+)']);
 		expect('/products/books').to.not.match(re);
 		expect('/products/books/1').to.match(re);
+
+		builder = new Builder({ version: '1.0' });
+		re = builder._buildRegExp(['products']);
+		expect('/1.0/products').to.match(re);
+
+		builder = new Builder({ basePath: 'api' });
+		re = builder._buildRegExp(['products']);
+		expect('/api/products').to.match(re);
+
+		builder = new Builder({ version: '1.0', basePath: 'api' });
+		re = builder._buildRegExp(['products']);
+		expect('/api/1.0/products').to.match(re);
+	});
+
+	it('#_parsePath()', function () {
+		builder = new Builder();
+		builder.pathFragments.push('products');
+
+		expect(builder._parsePath('/products/:id', { id: /\d+/ })).to.deep.equal(['(\\d+)']);
+		expect(
+			builder._parsePath(
+				'/products/:id/:name',
+				{ id: /\d+/, name: /\w+/ }
+			)
+		).to.deep.equal(['(\\d+)', '(\\w+)']);
+
+		// this is the case when /products/:id was defined earlier
+		builder.pathFragments.push('(\\d+)');
+		expect(builder._parsePath('/cars/:name', { name: /\w+/ })).to.deep.equal(['(\\w+)']);
 	});
 
 	it('#resource()', function () {
-		var ref;
+		var res;
 
 		builder = new Builder({ version: '1.0' });
-		ref = builder.resource('products');
+		res = builder.resource('products');
 
-		expect(ref).to.equal(builder);
-		expect(builder.pathFragments).deep.equal(['1.0', 'products']);
-		expect(builder.resources).to.have.length(0);
+		expect(builder.pathFragments).to.deep.equal(['products']);
+		expect(res).to.equal(builder);
+		expect(res.pathFragments).to.deep.equal(['products']);
+		expect(res.resources).to.have.length(0);
+
+		// handling references
+		var res2 = builder.resource('books');
+		expect(res2).to.equal(res);
+		expect(res2.pathFragments).to.deep.equal(['products', 'books']);
 	});
 
 	it('#getList()', function () {
-		var resource, ref;
+		var resource, res;
 
-		ref = builder.resource('products').getList(function () {});
+		res = builder.resource('products').getList(function () {});
 
-		expect(builder.pathFragments).to.deep.equal(['products']);
+		expect(res.pathFragments).to.deep.equal(['products']);
 		expect(builder.resources).to.have.length(1);
 
 		resource = builder.resources[0];
@@ -86,7 +127,7 @@ describe('Builder', function () {
 
 		// test nested resource
 
-		ref = ref.resource('books').getList(function () {});
+		res = res.resource('books').getList(function () {});
 
 		expect(builder.pathFragments).to.deep.equal(['products', 'books']);
 		expect(builder.resources).to.have.length(2);
@@ -103,12 +144,43 @@ describe('Builder', function () {
 		var resource;
 
 		builder.resource('products').get('/:id', { id: /\d+/ }, function () {});
-		resource = builder.resources[0];
 
 		expect(builder.pathFragments).to.deep.equal(['products', '(\\d+)']);
 		expect(builder.resources).to.have.length(1);
+
+		resource = builder.resources[0];
 		expect(resource.type).to.equal(Resource.Type.GET);
 		expect('/products').to.not.match(resource.path);
 		expect('/products/1').to.match(resource.path);
+	});
+
+	it('#save()', function () {
+		var resource;
+
+		builder.resource('products').save(function () {});
+
+		expect(builder.pathFragments).to.deep.equal(['products']);
+		expect(builder.resources).to.have.length(1);
+
+		resource = builder.resources[0];
+		expect(resource.type).to.equal(Resource.Type.SAVE);
+		expect('/products').to.match(resource.path);
+		expect('/products/1').to.not.match(resource.path);
+	});
+
+	it('#detach()', function () {
+		builder = new Builder({ version: '1.0' });
+
+		var res = builder.resource('products').detach();
+
+		builder.resource('books').getList(function () {});
+		res.resource('cars');
+
+		expect(builder.pathFragments).to.deep.equal(['products', 'books']);
+		expect(res.pathFragments).to.deep.equal(['products', 'cars']);
+
+		expect(builder.resources).to.have.length(1);
+		expect('/1.0/products/books').to.match(builder.resources[0].path);
+		expect(res.resources).to.have.length(0);
 	});
 });

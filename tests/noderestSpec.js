@@ -8,20 +8,20 @@ var noderest = require('../index');
 
 var api = noderest.create({ version: '1.0', basePath: 'api' });
 
-api
-	.resource('products')
-	.getList(function (params, done) {
-		var tab = [], limit = parseInt(params.limit, 10) || 20;
-		for(var i = 0; i < limit; i++) {
-			tab.push({ id: i, name: 'Product #' + i });
-		}
-		done(null, tab);
-	})
-	.get('/:id', { id: /\d+/ }, function (params, done) {
-		done(null, { id: params.id });
-	})
-	.to('products')
-	.resource('cars')
+var products = api.resource('products').detach();
+var cars = products.resource('cars').detach();
+
+api.getList(function (params, done) {
+	var tab = [], limit = parseInt(params.limit, 10) || 20;
+	for(var i = 0; i < limit; i++) {
+		tab.push({ id: i, name: 'Product #' + i });
+	}
+	done(null, tab);
+}).get('/:id', { id: /\d+/ }, function (params, done) {
+	done(null, { id: params.id });
+});
+
+var carsRes = cars
 	.getList(function (params, done) {
 		done(null, [{ id: 1, name: 'Volvo' }, { id: 2, name: 'Opel' }]);
 	})
@@ -38,7 +38,8 @@ var connect = require('connect'),
 app
 	.use(connect.bodyParser())
 	.use(connect.query())
-	.use(noderest.middleware(api));
+	.use(noderest.middleware(api))
+	.use(noderest.middleware(carsRes));
 
 http.createServer(app).listen(3123);
 
@@ -47,6 +48,24 @@ http.createServer(app).listen(3123);
 var expect = require('chai').expect;
 
 describe('overall', function () {
+	it('necessary headers', function (done) {
+		http.request({
+			port: 3123,
+			path: '/api/1.0/products'
+		}, function (res) {
+			var buf = '';
+			res.on('data', function (chunk) { buf += chunk; });
+			res.on('end', function () {
+				var obj = JSON.parse(buf);
+
+				expect(res.statusCode).to.equal(200);
+				expect(res.headers).to.have.property('content-type', 'application/json; charset=utf-8');
+
+				done();
+			});
+		}).end();
+	});
+
 	it('#getList()', function (done) {
 		var doneCounter = 3;
 
@@ -86,7 +105,6 @@ describe('overall', function () {
 
 		/** Nested */
 
-		// @TODO: doesn't work yet
 		http.request({
 			port: 3123,
 			path: '/api/1.0/products/cars'
@@ -94,10 +112,10 @@ describe('overall', function () {
 			var buf = '';
 			res.on('data', function (chunk) { buf += chunk; });
 			res.on('end', function () {
-				//var obj = JSON.parse(buf);
+				var obj = JSON.parse(buf);
 
-				//expect(res.statusCode).to.equal(200);
-				//expect(obj).to.have.length(10);
+				expect(res.statusCode).to.equal(200);
+				expect(obj).to.have.length(2);
 
 				!--doneCounter && done();
 			});
