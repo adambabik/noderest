@@ -205,4 +205,49 @@ describe('Builder', function () {
 		expect('/1.0/products/books').to.match(builder.resources[0].path);
 		expect(res.resources).to.have.length(0);
 	});
+
+	describe('#findResource()', function () {
+		var findResource = builder.findResource,
+			resources;
+
+		it('empty resources', function () {
+			expect(findResource(resources, '/books', 'GET')).to.be.null;
+		});
+
+		it('list resource', function () {
+			var getBooks = new Resource(Resource.Type.LIST, /^\/books$/, {}, null);
+			resources.push(getBooks);
+
+			expect(findResource(resources, '/books', 'GET')).to.equal(getBooks);
+			expect(findResource(resources, '/books/', 'GET')).to.be.null;
+			expect(findResource(resources, '/books/1', 'GET')).to.be.null;
+			expect(findResource(resources, '/books', 'POST')).to.be.null;
+			expect(findResource(resources, '/books', 'PUT')).to.be.null;
+			expect(findResource(resources, '/books', 'DELETE')).to.be.null;
+		});
+
+		it('save resource', function () {
+			expect(findResource(resources, '/cars', 'POST')).to.be.null;
+
+			var saveCars = new Resource(Resource.Type.SAVE, /^\/cars$/, {}, null);
+			resources.push(saveCars);
+
+			expect(findResource(resources, '/cars', 'GET')).to.be.null;
+			expect(findResource(resources, '/cars', 'POST')).to.equal(saveCars);
+		});
+
+		it('put resource', function () {
+			expect(findResource(resources, '/books/1', 'PUT')).to.be.null;
+			resources.push(new Resource(Resource.Type.UPDATE, /^\/books\/(\d+)$/, null, null));
+			expect(findResource(resources, '/books/1', 'PUT')).to.be.instanceof(Resource);
+			expect(findResource(resources, '/books/1', 'GET')).to.be.null;
+		});
+
+		it('delete resource', function () {
+			expect(findResource(resources, '/books/1', 'DELETE')).to.be.null;
+			resources.push(new Resource(Resource.Type.DELETE, /^\/books\/(\d+)$/, null, null));
+			expect(findResource(resources, '/books/1', 'DELETE')).to.be.instanceof(Resource);
+			expect(findResource(resources, '/books/1', 'GET')).to.be.null;
+		});
+	});
 });

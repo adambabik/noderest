@@ -1,44 +1,28 @@
 'use strict';
 
-var _        = require('lodash'),
-	url      = require('url');
+var a    = require('./assert'),
+	_    = require('lodash'),
+	req_ = require('./request'),
+	res_ = require('./response');
 
-function createContext(req, res, next) {
-	return { req: req, res: res, next: next };
-}
+var mid = module.exports = {};
 
-function urlParts(api, pathname) {
-	var parts    = pathname.split('/'),
-		sliceIdx = 1; // to remove the empty string from the beginning
+mid.parseUrl = function parseUrl(pathname, api) {
+	var parts  = pathname.split('/').slice(1),
+		result = { rest: parts };
 
-	sliceIdx += !!api.config.version;
-	sliceIdx += !!api.config.basePath;
-
-	parts = parts.slice(sliceIdx);
-
-	return parts;
-}
-
-function findResource(resources, pathname, method) {
-	var resource = null,
-		i        = 0,
-		len      = 0;
-
-	if (!resources.length) {
-		return null;
+	if (api.config.basePath) {
+		result.basePath = parts.shift();
 	}
 
-	for (i = 0, len = resources.length; i < len; i++) {
-		if (resources[i].path.test(pathname) && resources[i].matchHttpMethod(method)) {
-			resource = resources[i];
-			break;
-		}
+	if (api.config.version) {
+		result.version = parts.shift();
 	}
 
-	return resource;
-}
+	return result;
+};
 
-function parseParams(resource, query, parts) {
+mid.parseParams = function parseParams(resource, query, parts) {
 	var i      = 0,
 		len    = 0,
 		params = query && typeof query === 'object' ? _.clone(query) : {};
@@ -57,53 +41,46 @@ function parseParams(resource, query, parts) {
 	}
 
 	return params;
-}
-
-function middleware(api) {
-	if (typeof api !== 'object') {
-		throw new Error('You must pass noderest instance as the only argument');
-	}
-
-	return function (req, res, next) {
-		var reqUrl     = url.parse(req.url, true),
-			parts      = urlParts(api, reqUrl.pathname),
-			resources  = api.resources,
-			resource   = findResource(resources, reqUrl.pathname, req.method),
-			params     = null;
-
-		if (!resource) {
-			next();
-			return;
-		}
-
-		// `req.query` is parsed by connect's middleware
-		params = parseParams(resource, req.query, parts);
-
-		resource.handler.call(createContext(req, res, next), params, function (err, data) {
-			// set headers
-			res.setHeader('Content-Type', 'application/json; charset=utf-8');
-
-			if (err) {
-				// make sure the statusCode is not 200
-				if (res.statusCode < 400) {
-					res.statusCode = 400;
-				}
-
-				res.end(JSON.stringify(err));
-				return;
-			}
-
-			!data && (data = '');
-			res.end(JSON.stringify(data));
-		});
-	};
-}
-
-middleware._private = {
-	createContext : createContext,
-	urlParts      : urlParts,
-	findResource  : findResource,
-	parseParams   : parseParams
 };
 
-module.exports = middleware;
+mid.createContext = function createContext(req, res, next) {
+	return { req: req, res: res, next: next };
+};
+
+mid.respond = function respond(api, req, res) {
+	var resource = api.findResource(req.path, req.method),
+		parts    = this.parseUrl(req.path, api),
+		context  = this.createContext(req, res),
+		params;
+
+	if (!resource) {
+		return false;
+	}
+
+	params = this.parseParams(resource, req.query, parts.rest);
+
+	resource.handler.call(context, params, function (err, data) {
+		res.json(err || data);
+	});
+};
+
+mid.setup = function setup(api) {
+	a.obj(api);
+
+	var orig = {},
+		self = this;
+
+	return function noderest(req, res, next) {
+		orig.req = req.__proto__;
+		orig.res = res.__proto__;
+		req.__proto__ = req_;
+		res.__proto__ = res_;
+
+		if (self.respond(api, req, res) === false) {
+			req.__proto__ = orig.req;
+			res.__proto__ = orig.res;
+
+			next();
+		}
+	};
+};

@@ -19,3 +19,13 @@ a.num = function assertNumber(arg) {
 		throw new Error("Argument must be a number");
 	}
 };
+
+a.obj = function (arg) {
+	var t = typeof arg;
+
+	if (t !== 'object'
+		|| Array.isArray(t)
+		|| !t) {
+		throw new Error("Argument must be an object");
+	}
+};

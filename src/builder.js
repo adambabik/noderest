@@ -245,10 +245,39 @@ Builder.prototype.delete = function Builder_delete(path, config, handler) {
 
 /**
  * Create new instance of Builderwith current parh fragments, but empty resources array
+ *
  * @return {object} Builder
  */
 Builder.prototype.detach = function Builder_detach() {
 	return new Builder(this.config, this.pathFragments);
+};
+
+/**
+ * Find resource
+ *
+ * @param {String} pathname
+ * @param {String} method
+ * @return {Object} resource
+ */
+Builder.prototype.findResource = function Builder_findResource(pathname, method) {
+	var resources = this.resources,
+		res       = null,
+		i         = 0,
+		len       = 0;
+
+	if (!resources.length) {
+		return null;
+	}
+
+	for (i = 0, len = resources.length; i < len; i++) {
+		res = resources[i];
+		if (res.path.test(pathname) && res.matchHttpMethod(method)) {
+			break;
+		}
+		res = null;
+	}
+
+	return res;
 };
 
 module.exports = Builder;
