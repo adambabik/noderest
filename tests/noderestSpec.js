@@ -1,145 +1,164 @@
-/*global describe: false, it: false, before: false */
+/*global describe: false, it: false, beforeEach: false */
 
 'use strict';
 
-var noderest = require('../index');
+var noderest = require('../index'),
+	express  = require('express'),
+	http     = require('http');
 
-/** API */
+var expect   = require('chai').expect;
 
-var api = noderest.create({ version: '1.0', basePath: 'api' });
+describe('noderest', function () {
+	describe('initialize', function () {
+		it('not using existing express app', function (done) {
+			var api = noderest({ version: '1.0', basePath: 'api' });
+			api.init();
 
-var products = api.resource('products').detach();
-var cars = products.resource('cars').detach();
+			api.resource('products').getList(function (params, send) {
+				send(null, [{ id: 1 }, { id: 2 }]);
+			});
 
-api.getList(function (params, done) {
-	var tab = [], limit = parseInt(params.limit, 10) || 20;
-	for(var i = 0; i < limit; i++) {
-		tab.push({ id: i, name: 'Product #' + i });
-	}
-	done(null, tab);
-}).get('/:id', { id: /\d+/ }, function (params, done) {
-	done(null, { id: params.id });
+			var server = api.listen(3000);
+
+			var req = http.request({
+				port: 3000,
+				path: '/api/1.0/products'
+			}, function (res) {
+				var buf = '';
+
+				res.on('data', function (chunk) {
+					buf += chunk;
+				});
+
+				res.on('end', function () {
+					var data = JSON.parse(buf);
+					expect(data).to.have.length(2);
+
+					server.close(function () {
+						done();
+					});
+				});
+			});
+			req.end();
+		});
+
+		it('using existing express app', function (done) {
+			var api = noderest({ version: '1.0', basePath: 'api' }),
+				app = express();
+
+			api.init(app);
+
+			api.resource('products').getList(function (params, send) {
+				send(null, [{ id: 1 }, { id: 2 }]);
+			});
+
+			var server = api.listen(3002);
+
+			var req = http.request({
+				port: 3002,
+				path: '/api/1.0/products'
+			}, function (res) {
+				var buf = '';
+
+				res.on('data', function (chunk) {
+					buf += chunk;
+				});
+
+				res.on('end', function () {
+					var data = JSON.parse(buf);
+					expect(data).to.have.length(2);
+
+					server.close(function () {
+						done();
+					});
+				});
+			});
+			req.end();
+		});
+	});
+
+	describe('public methods', function () {
+		function close(server, counter, done) {
+			if (counter === 0) {
+				server.close(function () {
+					done();
+				});
+			}
+		}
+
+		var api;
+
+		beforeEach(function () {
+			api = noderest({ basePath: 'api' });
+			api.init();
+		});
+
+		it('#getList()', function (done) {
+			var doneCounter = 2;
+
+			api.resource('products').getList(function (params, send) {
+				var arr = [],
+					limit = params.limit || 10;
+
+				for (var i = 0; i < limit; i++) {
+					arr[i] = { id: i };
+				}
+
+				send(null, arr);
+			});
+
+			var server = api.listen(3000);
+
+			http.request({
+				port: 3000,
+				path: '/api/products'
+			}, function (res) {
+				var buf = '';
+				res.on('data', function (chunk) { buf += chunk; });
+				res.on('end', function () {
+					var data = JSON.parse(buf);
+					expect(data).to.have.length(10);
+					close(server, --doneCounter, done);
+				});
+			}).end();
+
+			http.request({
+				port: 3000,
+				path: '/api/products?limit=5'
+			}, function (res) {
+				var buf = '';
+				res.on('data', function (chunk) { buf += chunk; });
+				res.on('end', function () {
+					var data = JSON.parse(buf);
+					expect(data).to.have.length(5);
+					close(server, --doneCounter, done);
+				});
+			}).end();
+		});
+
+		it('#get()', function (done) {
+			var doneCounter = 1;
+
+			api.resource('products').get('/:id', { id: /\d+/ }, function (params, send) {
+				var id = parseInt(params.id, 10);
+				send(null, { id: id });
+			});
+
+			var server = api.listen(3000);
+
+			http.request({
+				port: 3000,
+				path: '/api/products/1'
+			}, function (res) {
+				var buf = '';
+				res.on('data', function (chunk) { buf += chunk; });
+				res.on('end', function () {
+					var data = JSON.parse(buf);
+					expect(data).to.have.property('id', 1);
+					close(server, --doneCounter, done);
+				});
+			}).end();
+		});
+	});
 });
 
-var carsRes = cars
-	.getList(function (params, done) {
-		done(null, [{ id: 1, name: 'Volvo' }, { id: 2, name: 'Opel' }]);
-	})
-	.get('/:name', { name: /\w+/ }, function (params, done) {
-		done(null, { id: 1, name: params.name });
-	});
-
-/** Server */
-
-var connect = require('connect'),
-	http    = require('http'),
-	app     = connect();
-
-app
-	.use(connect.bodyParser())
-	.use(connect.query())
-	.use(noderest.middleware(api))
-	.use(noderest.middleware(carsRes));
-
-http.createServer(app).listen(3123);
-
-/** Tests */
-
-var expect = require('chai').expect;
-
-describe('overall', function () {
-	it('necessary headers', function (done) {
-		http.request({
-			port: 3123,
-			path: '/api/1.0/products'
-		}, function (res) {
-			var buf = '';
-			res.on('data', function (chunk) { buf += chunk; });
-			res.on('end', function () {
-				var obj = JSON.parse(buf);
-
-				expect(res.statusCode).to.equal(200);
-				expect(res.headers).to.have.property('content-type', 'application/json; charset=utf-8');
-
-				done();
-			});
-		}).end();
-	});
-
-	it('#getList()', function (done) {
-		var doneCounter = 3;
-
-		http.request({
-			port: 3123,
-			path: '/api/1.0/products'
-		}, function (res) {
-			var buf = '';
-			res.on('data', function (chunk) { buf += chunk; });
-			res.on('end', function () {
-				var obj = JSON.parse(buf);
-
-				expect(res.statusCode).to.equal(200);
-				expect(obj).to.have.length(20);
-
-				!--doneCounter && done();
-			});
-		}).end();
-
-		/** With limit */
-
-		http.request({
-			port: 3123,
-			path: '/api/1.0/products?limit=10'
-		}, function (res) {
-			var buf = '';
-			res.on('data', function (chunk) { buf += chunk; });
-			res.on('end', function () {
-				var obj = JSON.parse(buf);
-
-				expect(res.statusCode).to.equal(200);
-				expect(obj).to.have.length(10);
-
-				!--doneCounter && done();
-			});
-		}).end();
-
-		/** Nested */
-
-		http.request({
-			port: 3123,
-			path: '/api/1.0/products/cars'
-		}, function (res) {
-			var buf = '';
-			res.on('data', function (chunk) { buf += chunk; });
-			res.on('end', function () {
-				var obj = JSON.parse(buf);
-
-				expect(res.statusCode).to.equal(200);
-				expect(obj).to.have.length(2);
-
-				!--doneCounter && done();
-			});
-		}).end();
-	});
-
-	it('#get()', function (done) {
-		var doneCounter = 1;
-
-		http.request({
-			port: 3123,
-			path: '/api/1.0/products/1'
-		}, function (res) {
-			var buf = '';
-			res.on('data', function (chunk) { buf += chunk; });
-			res.on('end', function () {
-				var obj = JSON.parse(buf);
-
-				expect(res.statusCode).to.equal(200);
-				expect(obj).to.be.an('object');
-				expect(obj).to.have.property('id', '1');
-
-				!--doneCounter && done();
-			});
-		}).end();
-	});
-});

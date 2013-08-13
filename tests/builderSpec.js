@@ -4,13 +4,15 @@
 
 var expect   = require('chai').expect,
 	Builder  = require('../src/builder'),
-	Resource = require('../src/resource');
+	Resource = require('../src/resource'),
+	express  = require('express');
 
 describe('Builder', function () {
 	var builder;
 
 	beforeEach(function () {
 		builder = new Builder({});
+		builder.app = express();
 	});
 
 	describe('#controller()', function () {
@@ -56,53 +58,53 @@ describe('Builder', function () {
 		});
 	});
 
-	it('#_buildRegExp()', function () {
+	it('#buildRegExp()', function () {
 		var re;
 		builder = new Builder();
 
-		expect(builder._buildRegExp([])).instanceof(RegExp);
+		expect(builder.buildRegexp([])).instanceof(RegExp);
 
-		re = builder._buildRegExp(['products']);
+		re = builder.buildRegexp(['products']);
 		expect('/products').to.match(re);
 		expect('/products/').to.not.match(re);
 		expect('/products?test=true').to.not.match(re); // test only against pathname
 
-		re = builder._buildRegExp(['products', 'books']);
+		re = builder.buildRegexp(['products', 'books']);
 		expect('/products/books').to.match(re);
 
-		re = builder._buildRegExp(['products', '(\\d+)']);
+		re = builder.buildRegexp(['products', '(\\d+)']);
 		expect('/products').to.not.match(re);
 		expect('/products/1').to.match(re);
 		expect('/products/1?test=true').to.not.match(re); // test only against pathname
 
-		re = builder._buildRegExp(['products', 'books', '(\\d+)']);
+		re = builder.buildRegexp(['products', 'books', '(\\d+)']);
 		expect('/products/books').to.not.match(re);
 		expect('/products/books/1').to.match(re);
 
 		builder = new Builder({ version: '1.0' });
-		re = builder._buildRegExp(['products']);
+		re = builder.buildRegexp(['products']);
 		expect('/1.0/products').to.match(re);
 
 		builder = new Builder({ basePath: 'api' });
-		re = builder._buildRegExp(['products']);
+		re = builder.buildRegexp(['products']);
 		expect('/api/products').to.match(re);
 
 		builder = new Builder({ version: '1.0', basePath: 'api' });
-		re = builder._buildRegExp(['products']);
+		re = builder.buildRegexp(['products']);
 		expect('/api/1.0/products').to.match(re);
 
 		builder = new Builder({ typeSuffix: true });
-		re = builder._buildRegExp(['products']);
+		re = builder.buildRegexp(['products']);
 		expect('/products.json').to.match(re);
 	});
 
-	it('#_parsePath()', function () {
+	it('#parsePath()', function () {
 		builder = new Builder();
 		builder.pathFragments.push('products');
 
-		expect(builder._parsePath('/products/:id', { id: /\d+/ })).to.deep.equal(['(\\d+)']);
+		expect(builder.parsePath('/products/:id', { id: /\d+/ })).to.deep.equal(['(\\d+)']);
 		expect(
-			builder._parsePath(
+			builder.parsePath(
 				'/products/:id/:name',
 				{ id: /\d+/, name: /\w+/ }
 			)
@@ -110,7 +112,7 @@ describe('Builder', function () {
 
 		// this is the case when /products/:id was defined earlier
 		builder.pathFragments.push('(\\d+)');
-		expect(builder._parsePath('/cars/:name', { name: /\w+/ })).to.deep.equal(['(\\w+)']);
+		expect(builder.parsePath('/cars/:name', { name: /\w+/ })).to.deep.equal(['(\\w+)']);
 	});
 
 	it('#resource()', function () {
@@ -192,6 +194,7 @@ describe('Builder', function () {
 
 	it('#detach()', function () {
 		builder = new Builder({ version: '1.0' });
+		builder.app = express();
 
 		var res = builder.resource('products').detach();
 
@@ -204,50 +207,5 @@ describe('Builder', function () {
 		expect(builder.resources).to.have.length(1);
 		expect('/1.0/products/books').to.match(builder.resources[0].path);
 		expect(res.resources).to.have.length(0);
-	});
-
-	describe('#findResource()', function () {
-		var findResource = builder.findResource,
-			resources;
-
-		it('empty resources', function () {
-			expect(findResource(resources, '/books', 'GET')).to.be.null;
-		});
-
-		it('list resource', function () {
-			var getBooks = new Resource(Resource.Type.LIST, /^\/books$/, {}, null);
-			resources.push(getBooks);
-
-			expect(findResource(resources, '/books', 'GET')).to.equal(getBooks);
-			expect(findResource(resources, '/books/', 'GET')).to.be.null;
-			expect(findResource(resources, '/books/1', 'GET')).to.be.null;
-			expect(findResource(resources, '/books', 'POST')).to.be.null;
-			expect(findResource(resources, '/books', 'PUT')).to.be.null;
-			expect(findResource(resources, '/books', 'DELETE')).to.be.null;
-		});
-
-		it('save resource', function () {
-			expect(findResource(resources, '/cars', 'POST')).to.be.null;
-
-			var saveCars = new Resource(Resource.Type.SAVE, /^\/cars$/, {}, null);
-			resources.push(saveCars);
-
-			expect(findResource(resources, '/cars', 'GET')).to.be.null;
-			expect(findResource(resources, '/cars', 'POST')).to.equal(saveCars);
-		});
-
-		it('put resource', function () {
-			expect(findResource(resources, '/books/1', 'PUT')).to.be.null;
-			resources.push(new Resource(Resource.Type.UPDATE, /^\/books\/(\d+)$/, null, null));
-			expect(findResource(resources, '/books/1', 'PUT')).to.be.instanceof(Resource);
-			expect(findResource(resources, '/books/1', 'GET')).to.be.null;
-		});
-
-		it('delete resource', function () {
-			expect(findResource(resources, '/books/1', 'DELETE')).to.be.null;
-			resources.push(new Resource(Resource.Type.DELETE, /^\/books\/(\d+)$/, null, null));
-			expect(findResource(resources, '/books/1', 'DELETE')).to.be.instanceof(Resource);
-			expect(findResource(resources, '/books/1', 'GET')).to.be.null;
-		});
 	});
 });
