@@ -10,8 +10,8 @@ Creating new noderest object using factory pattern:
 ```javascript
 var myAPI = Noderest.create({
 	version: 1.0,
-	authentication: Noderest.auth.OAuth2,
-	types: ['json', 'xml']
+	basePath: 'api',
+	types: ['json'] // only supported now
 });
 ```
 
@@ -20,18 +20,18 @@ Now, we can create a resources:
 ```javascript
 myAPI
 	.resource('products')
-	// this generates resource GET /1.0/products
+	// generates resource GET /1.0/products
 	.getList(function (params, done) {
 		// need a request object? this.req
 		// need a response object? this.res
 		// need a next callback? this.next
 
 		Products.find({ name: 'Mars' }).limit(params.limit || 10).exec(function (err, docs) {
-			done(err, docs.map(function (doc) { return doc.toJSON(); }));
+			done(err, docs);
 		});
 	})
 	// GET /1.0/products/:id
-	.get(':id', { id: ':digit' }, function (params, done) {
+	.get(':id', { id: /^\d+$/ }, function (params, done) {
 		Products.findOne({ id: params.id }, function (err, doc) {
 			done(err, doc.toJSON());
 		});
@@ -39,7 +39,7 @@ myAPI
 	.resource('buyers')
 	// GET /1.0/products/:id/buyers
 	.getList(function (params, done) {
-		done(null, null); // this generates 204 No Content
+		done(null, null); // returns 204 No Content
 	})
 	// get back to /1.0/products
 	.back('products')
