@@ -7,13 +7,11 @@
     "test": "mocha -R spec -b ./tests"
   },
   "dependencies": {
-    "lodash": "~1.2.1",
-    "express": "~3.3.4"
+    "lodash": "~1.2.1"
   },
   "devDependencies": {
     "mocha": "*",
-    "chai": "*",
-    "connect": "~2.8.4"
+    "chai": "*"
   },
   "repository": {
     "type": "git",
