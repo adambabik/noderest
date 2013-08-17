@@ -8,26 +8,27 @@ A high-level abstraction for REST APIs build with node.js.
 Creating new noderest object using factory pattern:
 
 ```javascript
-var myAPI = Noderest.create({
+var nodereset = require('noderest');
+
+var api = noderest({
 	version: 1.0,
-	basePath: 'api',
-	types: ['json'] // only supported now
+	basePath: 'api'
 });
 ```
 
 Now, we can create a resources:
 
 ```javascript
-myAPI
+api
 	.resource('products')
 	// generates resource GET /1.0/products
-	.getList(function (params, done) {
+	.all(function (params, done) {
 		// need a request object? this.req
 		// need a response object? this.res
 		// need a next callback? this.next
 
 		Products.find({ name: 'Mars' }).limit(params.limit || 10).exec(function (err, docs) {
-			done(err, docs);
+			done(err, docs.map(function (d) { d.toJSON() }));
 		});
 	})
 	// GET /1.0/products/:id
@@ -36,13 +37,8 @@ myAPI
 			done(err, doc.toJSON());
 		});
 	})
-	.resource('buyers')
-	// GET /1.0/products/:id/buyers
-	.getList(function (params, done) {
-		done(null, null); // returns 204 No Content
-	})
 	// get back to /1.0/products
-	.back('products')
+	.end()
 	// POST /1.0/products
 	.save(function (data, params, done) {
 		Products.create(data, function (err, product) {
@@ -53,6 +49,11 @@ myAPI
 	.update(':id', { id: /^\d+$/ }, function (data, params, done) {
 		Producer.findAndUpdate(...);
 	});
+	.resource('buyers')
+	// GET /1.0/products/:id/buyers
+	.all(function (params, done) {
+		done(null, null); // returns 204 No Content
+	});
 ```
 
 Register as a middleware:
@@ -60,7 +61,7 @@ Register as a middleware:
 ```javascript
 var connect = require('connect'),
     http    = require('http'),
-    app     = connect().use(myAPI.middleware());
+    app     = connect().use(noderest.middleware(api));
 
 http.createServer(app).listen(3000);
 ```

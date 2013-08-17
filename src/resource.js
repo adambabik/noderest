@@ -7,17 +7,17 @@ var _ = require('lodash');
  *
  * @constructor
  * @param {String}        method HTTP method
- * @param {String|RegExp} path
+ * @param {String|RegExp} pathRe
  * @param {Object}        params Description of what regex match
  * @param {Function}      handler Request handler
  */
-function Resource(type, path, params, handler) {
-  if (!_.isNuber(type)) {
+function Resource(type, pathRe, params, handler) {
+  if (!_.isNumber(type)) {
     throw new Error("'type' must be a number");
   }
 
   this.type = type;
-  this.path = path;
+  this.path = pathRe;
   this.params = params;
   this.handler = handler;
 }

@@ -4,15 +4,13 @@
 
 var expect   = require('chai').expect,
 	Builder  = require('../src/builder'),
-	Resource = require('../src/resource'),
-	express  = require('express');
+	Resource = require('../src/resource');
 
 describe('Builder', function () {
 	var builder;
 
 	beforeEach(function () {
 		builder = new Builder({});
-		builder.app = express();
 	});
 
 	describe('#controller()', function () {
@@ -98,23 +96,6 @@ describe('Builder', function () {
 		expect('/products.json').to.match(re);
 	});
 
-	it('#parsePath()', function () {
-		builder = new Builder();
-		builder.pathFragments.push('products');
-
-		expect(builder.parsePath('/products/:id', { id: /\d+/ })).to.deep.equal(['(\\d+)']);
-		expect(
-			builder.parsePath(
-				'/products/:id/:name',
-				{ id: /\d+/, name: /\w+/ }
-			)
-		).to.deep.equal(['(\\d+)', '(\\w+)']);
-
-		// this is the case when /products/:id was defined earlier
-		builder.pathFragments.push('(\\d+)');
-		expect(builder.parsePath('/cars/:name', { name: /\w+/ })).to.deep.equal(['(\\w+)']);
-	});
-
 	it('#resource()', function () {
 		var res;
 
@@ -132,10 +113,10 @@ describe('Builder', function () {
 		expect(res2.pathFragments).to.deep.equal(['products', 'books']);
 	});
 
-	it('#getList()', function () {
+	it('#all()', function () {
 		var resource, res;
 
-		res = builder.resource('products').getList(function () {});
+		res = builder.resource('products').all(function () {});
 
 		expect(res.pathFragments).to.deep.equal(['products']);
 		expect(builder.resources).to.have.length(1);
@@ -151,7 +132,7 @@ describe('Builder', function () {
 
 		// test nested resource
 
-		res = res.resource('books').getList(function () {});
+		res = res.resource('books').all(function () {});
 
 		expect(builder.pathFragments).to.deep.equal(['products', 'books']);
 		expect(builder.resources).to.have.length(2);
@@ -169,7 +150,7 @@ describe('Builder', function () {
 
 		builder.resource('products').get('/:id', { id: /\d+/ }, function () {});
 
-		expect(builder.pathFragments).to.deep.equal(['products', '(\\d+)']);
+		expect(builder.pathFragments).to.deep.equal(['products', '/:id']);
 		expect(builder.resources).to.have.length(1);
 
 		resource = builder.resources[0];
@@ -194,11 +175,10 @@ describe('Builder', function () {
 
 	it('#detach()', function () {
 		builder = new Builder({ version: '1.0' });
-		builder.app = express();
 
 		var res = builder.resource('products').detach();
 
-		builder.resource('books').getList(function () {});
+		builder.resource('books').all(function () {});
 		res.resource('cars');
 
 		expect(builder.pathFragments).to.deep.equal(['products', 'books']);
@@ -206,6 +186,6 @@ describe('Builder', function () {
 
 		expect(builder.resources).to.have.length(1);
 		expect('/1.0/products/books').to.match(builder.resources[0].path);
-		expect(res.resources).to.have.length(0);
+		expect(res.resources).to.have.length(1);
 	});
 });
