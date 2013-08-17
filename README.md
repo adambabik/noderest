@@ -52,7 +52,7 @@ api
 	.resource('buyers')
 	// GET /1.0/products/:id/buyers
 	.all(function (params, done) {
-		done(null, null); // returns 204 No Content
+		done(null, []);
 	});
 ```
 
